@@ -1,0 +1,152 @@
+#property copyright "QuantScale"
+
+// Include necessary libraries
+#include <Trade\Trade.mqh>
+CTrade trade;  // Trade object for executing trades
+
+// Input parameters for the ADX and SAR indicators
+input int ADX_Period = 200;
+input double SAR_Step = 0.01;
+input double SAR_Max = 2;
+
+// Handles for the ADX and SAR indicators
+int adx_handle, sar_handle;
+
+// Arrays to store indicator values
+double ADX_Upper_Array[], ADX_Lower_Array[], SAR_Array[];
+
+// Variable to store the entry bar index
+static int entry_bar = 0;
+
+// Initialization function
+int OnInit() {
+    // Initialize ADX and SAR indicators
+    adx_handle = iADX(_Symbol, PERIOD_CURRENT, ADX_Period);
+    sar_handle = iSAR(_Symbol, PERIOD_CURRENT, SAR_Step, SAR_Max);
+
+    // Set timer to call OnTimer function every 60 seconds
+    EventSetTimer(60);
+
+    return (INIT_SUCCEEDED);  // Return initialization success
+}
+
+// Deinitialization function
+void OnDeinit(const int reason) {
+    EventKillTimer();  // Kill the timer
+}
+
+// Function called on each tick
+void OnTick() {
+    Get_Indicator_Values();  // Get the latest indicator values
+    int signal = Signal_Function();  // Get trading signal
+    double Ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+    double Bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+    // Open positions based on the trading signal
+    if (PositionsTotal() == 0) {
+        if (signal == 1) {
+            trade.Buy(0.01, _Symbol, Ask, 0, 0, "BUY");
+            entry_bar = iBars(_Symbol, PERIOD_CURRENT);
+        }
+        if (signal == 2) {
+            trade.Sell(0.01, _Symbol, Bid, 0, 0, "SELL");
+            entry_bar = iBars(_Symbol, PERIOD_CURRENT);
+        }
+    }
+
+    Trailing_Stop();  // Apply trailing stop if enabled
+    Closing_Positions();  // Close positions based on crossover
+}
+
+// Function to get the latest indicator values
+void Get_Indicator_Values() {
+    int copied_adx_upper = CopyBuffer(adx_handle, 1, 1, 2, ADX_Upper_Array);
+    int copied_adx_lower = CopyBuffer(adx_handle, 2, 1, 2, ADX_Lower_Array);
+    int copied_sar = CopyBuffer(sar_handle, 0, 1, 2, SAR_Array);
+
+    // Print error if not enough data is available
+    if (copied_adx_upper < 2 || copied_adx_lower < 2 || copied_sar < 2) {
+        Print("Not enough data to copy indicator values");
+    }
+}
+
+// Function to generate trading signals based on indicator values
+int Signal_Function() {
+    // Ensure there is enough data to generate a signal
+    if (ArraySize(ADX_Upper_Array) < 2 || ArraySize(ADX_Lower_Array) < 2 || ArraySize(SAR_Array) < 2) {
+        return 0;  // No signal if not enough data
+    }
+
+    // Check for buy signal
+    if (ADX_Upper_Array[1] > ADX_Lower_Array[1]) {
+        if (SAR_Array[0] > iClose(_Symbol, PERIOD_CURRENT, 2) && SAR_Array[1] < iClose(_Symbol, PERIOD_CURRENT, 1)) {
+            return 1;
+        }
+    }
+
+    // Check for sell signal
+    if (ADX_Upper_Array[1] < ADX_Lower_Array[1]) {
+        if (SAR_Array[0] < iClose(_Symbol, PERIOD_CURRENT, 2) && SAR_Array[1] > iClose(_Symbol, PERIOD_CURRENT, 1)) {
+            return 2;
+        }
+    }
+
+    return 0;  // No signal
+}
+
+// Function to close positions based on crossover
+void Closing_Positions() {
+    // Ensure there is enough data to check for crossover
+    if (ArraySize(ADX_Upper_Array) < 2 || ArraySize(ADX_Lower_Array) < 2) {
+        return;  // Not enough data to perform closing
+    }
+
+    bool Crossover = (ADX_Lower_Array[0] > ADX_Upper_Array[0] && ADX_Lower_Array[1] < ADX_Upper_Array[1]) ||
+                     (ADX_Lower_Array[0] < ADX_Upper_Array[0] && ADX_Lower_Array[1] > ADX_Upper_Array[1]);
+
+    // Close positions if crossover occurs and it's not the entry bar
+    if (Crossover && iBars(_Symbol, PERIOD_CURRENT) != entry_bar) {
+        for (int x = 0; x < PositionsTotal(); x++) {
+            ulong ticket = PositionGetTicket(x);
+            trade.PositionClose(ticket, -1);
+        }
+    }
+}
+
+// Input parameter to enable/disable trailing stop
+input bool Use_TS = false;
+
+// Function to apply trailing stop
+void Trailing_Stop() {
+    if (!Use_TS) {
+        return;  // Exit if trailing stop is not enabled
+    }
+
+    // Ensure there is enough data to apply trailing stop
+    if (ArraySize(SAR_Array) < 2) {
+        return;  // Not enough data to perform trailing stop
+    }
+
+    // Loop through all open positions and apply trailing stop
+    for (int i = 0; i < PositionsTotal(); i++) {
+        ulong ticket = PositionGetTicket(i);
+        double CurrentPrice = PositionGetDouble(POSITION_PRICE_CURRENT);
+        int type = PositionGetInteger(POSITION_TYPE);
+        double stop_loss = PositionGetDouble(POSITION_SL);
+        double take_profit = PositionGetDouble(POSITION_TP);
+
+        // Apply trailing stop for buy positions
+        if (type == POSITION_TYPE_BUY) {
+            if (SAR_Array[1] < CurrentPrice && SAR_Array[1] > stop_loss) {
+                trade.PositionModify(ticket, SAR_Array[1], take_profit);
+            }
+        }
+
+        // Apply trailing stop for sell positions
+        if (type == POSITION_TYPE_SELL) {
+            if (SAR_Array[1] > CurrentPrice && SAR_Array[1] < stop_loss) {
+                trade.PositionModify(ticket, SAR_Array[1], take_profit);
+            }
+        }
+    }
+}
