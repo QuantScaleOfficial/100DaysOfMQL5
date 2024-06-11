@@ -1,0 +1,81 @@
+#include <Trade/Trade.mqh>
+
+input double Lots = 1.0;
+input string Symbol1 = "EURUSD";
+input string Symbol2 = "USDJPY";
+
+string objNameBtn1 = "MCT BTN1";
+string objNameBtn2 = "MCT BTN2";
+string objNameBtn3 = "MCT Close";
+
+CTrade trade;
+
+///---------------------
+int OnInit(){
+  createBtn(objNameBtn1,10,50,300,50,"buy "+ Symbol1 +" sell "+Symbol2);
+  createBtn(objNameBtn2,10,100,300,50,"sell "+ Symbol1 +" buy "+Symbol2);
+  createBtn(objNameBtn3,10,150,300,50,"close trades");
+  ChartRedraw();
+   
+   return(INIT_SUCCEEDED);
+  }
+
+///---------------------
+void OnDeinit(const int reason){
+  ObjectsDeleteAll(0,"MCT");
+   
+  }
+
+///---------------------
+void OnTick(){
+   
+  }
+
+///---------------------
+void OnChartEvent(
+  const int id,
+  const long& lparam,
+  const double& dparam,
+  const string& sparam
+){
+  if(sparam == objNameBtn1){
+    Print("first button was clicked");
+    trade.Buy(Lots,Symbol1);
+    trade.Sell(Lots,Symbol2);
+    ObjectSetInteger(0,objNameBtn1,OBJPROP_STATE,false);
+    ChartRedraw();
+  }else if(sparam == objNameBtn2){
+    Print("second button was clicked");
+    trade.Buy(Lots,Symbol2);
+    trade.Sell(Lots,Symbol1);
+    ObjectSetInteger(0,objNameBtn2,OBJPROP_STATE,false);
+    ChartRedraw();
+
+  }else if(sparam == objNameBtn3){
+    Print("third button was clicked");
+    for(int i = PositionsTotal()-1; i >= 0; i--){
+      ulong posTicket = PositionGetTicket(i);
+      if(PositionSelectByTicket(posTicket)){
+        string posSymbol = PositionGetString(POSITION_SYMBOL);
+        if(posSymbol == Symbol1 || posSymbol == Symbol2){
+          if(trade.PositionClose(posTicket)){
+            Print("The pos #",posTicket," was closed");
+          }
+        }
+        }
+    }
+    ObjectSetInteger(0,objNameBtn3,OBJPROP_STATE,false);
+    ChartRedraw();    
+
+  }
+
+}
+///---------------------
+void createBtn(string objName,int xDist, int yDist, int xSize, int ySize, string txt){
+  ObjectCreate(0,objName,OBJ_BUTTON,0,0,0);
+  ObjectSetInteger(0,objName,OBJPROP_XDISTANCE,10,xDist);
+  ObjectSetInteger(0,objName,OBJPROP_YDISTANCE,150,yDist);
+  ObjectSetInteger(0,objName,OBJPROP_XSIZE,300,xSize);
+  ObjectSetInteger(0,objName,OBJPROP_YSIZE,50,ySize);
+  ObjectSetString(0,objName,OBJPROP_TEXT,"sell this buy this",txt);
+}
