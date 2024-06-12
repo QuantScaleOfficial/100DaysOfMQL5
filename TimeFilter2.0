@@ -1,0 +1,27 @@
+
+input int TimeStartHour = 7;
+input int TimeStartMin = 10;
+
+input int TimeEndHour = 15;
+input int TimeEndMin = 10;
+
+void OnTick(){
+  MqlDateTime structTime;
+  TimeCurrent(structTime);
+  structTime.sec = 0;
+
+  structTime.hour = TimeStartHour;
+  structTime.min = TimeStartMin;
+  datetime timeStart = StructToTime(structTime);
+
+  structTime.hour = TimeEndHour;
+  structTime.min = TimeEndMin;
+  datetime timeEnd = StructToTime(structTime);
+
+  bool isTime = TimeCurrent() >= timeStart && TimeCurrent() < timeEnd;
+
+  Comment("\nServer Time: ",TimeCurrent(),
+          "\nTime Start Dt: ",timeStart,
+          "\nTime End Dt: ",timeEnd,
+          "\nTime Filter: ", isTime);
+  }
