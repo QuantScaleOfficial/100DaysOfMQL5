@@ -1,0 +1,23 @@
+
+input string TimeStart = "07:00";
+input string TimeEnd = "12:00";
+
+int OnInit(){
+   return(INIT_SUCCEEDED);
+  }
+void OnDeinit(const int reason){
+   
+  }
+void OnTick(){
+  datetime timeStart = StringToTime(TimeStart);
+  datetime timeEnd = StringToTime(TimeEnd);
+
+  bool isTime = TimeCurrent() >= timeStart && TimeCurrent() < timeEnd;
+
+  Comment("\nTime Start Input: ",TimeStart,
+          "\nTime Start Dt: ",timeStart,
+          "\nTime End Input: ",TimeEnd,
+          "\nTime End Dt: ",timeEnd,
+          "\nTime Filter: ", isTime);
+   
+  }
