@@ -1,0 +1,51 @@
+#include <Trade/Trade.mqh>
+
+
+
+int OnInit()
+  {
+
+   return(INIT_SUCCEEDED);
+  }
+void OnDeinit(const int reason)
+  {
+   
+  }
+void OnTick()
+  {
+    if(PositionsTotal() == 0){
+   
+    double entry = SymbolInfoDouble(_Symbol,SYMBOL_ASK);
+    entry = NormalizeDouble(entry, _Digits);
+
+    double sl = entry - 280 * _Point;
+    sl = NormalizeDouble(sl,_Digits);
+
+    double lots = calcLots(1.0,entry - sl);
+    CTrade trade;
+    trade.Buy(lots, _Symbol,entry,sl);
+  }
+}
+
+  double calcLots(double riskPercent, double slDistance){
+  double ticksize   = SymbolInfoDouble(_Symbol,SYMBOL_TRADE_TICK_SIZE);
+  double tickvalue  = SymbolInfoDouble(_Symbol,SYMBOL_TRADE_TICK_VALUE);
+  double lotstep    = SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_STEP);
+
+  if(ticksize == 0 || tickvalue == 0 || lotstep == 0){
+    Print(__FUNCTION__," > Lotsize cannot be calculated...");
+    return 0;
+  }
+
+  double riskMoney = AccountInfoDouble(ACCOUNT_BALANCE) * riskPercent / 100;
+  double moneyLotstep = (slDistance / ticksize) * tickvalue * lotstep;
+
+  if(moneyLotstep == 0){
+    Print(__FUNCTION__," > Lotsize cannot be calculated...");
+    return 0;
+  }
+
+  double lots = MathFloor(riskMoney /moneyLotstep) * lotstep;
+
+  return lots;
+}
